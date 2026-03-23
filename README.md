@@ -1,4 +1,4 @@
-# CareerHub — India Job Market Visualizer
+# 🎯 CareerHub — India Job Market Visualizer
 
 An interactive treemap visualization of **100 occupations** across the Indian economy, covering **530M+ jobs**. Built by **Krishna Shahane**.
 
