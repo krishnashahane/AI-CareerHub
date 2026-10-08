@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import time
+from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 # ---------------------------------------------------------------------------
@@ -45,7 +46,10 @@ def main():
     # Figure out what needs scraping (cache based on html/ existence)
     to_scrape = []
     for i, occ in enumerate(subset, start=args.start):
-        html_path = f"html/{occ['slug']}.html"
+        slug = occ.get("slug", "").strip()
+        if not slug or slug in {".", ".."} or "/" in slug or "\" in slug:
+            raise ValueError(f"Invalid occupation slug: {slug!r}")
+        html_path = str(Path("html") / f"{slug}.html")
         if not args.force and os.path.exists(html_path):
             print(f"  [{i}] CACHED {occ['title']}")
             continue
@@ -58,8 +62,9 @@ def main():
     print(f"\nScraping {len(to_scrape)} occupations (non-headless Chromium)...\n")
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
+        page.set_default_timeout(15000)
 
         for idx, (i, occ) in enumerate(to_scrape):
             slug = occ["slug"]
@@ -69,8 +74,10 @@ def main():
             print(f"  [{i}] {occ['title']}...", end=" ", flush=True)
 
             try:
+                if not url.startswith("https://www.bls.gov/"):
+                    raise ValueError(f"Refusing to scrape non-BLS URL: {url!r}")
                 resp = page.goto(url, wait_until="domcontentloaded", timeout=15000)
-                if resp.status != 200:
+                if not resp or resp.status != 200:
                     print(f"HTTP {resp.status} — SKIPPED")
                     continue
 
