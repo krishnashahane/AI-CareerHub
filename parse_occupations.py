@@ -1,13 +1,17 @@
 """Parse BLS Occupational Outlook Handbook A-Z index to extract all occupations."""
 
+from pathlib import Path
 from bs4 import BeautifulSoup
 import json
 
-with open("occupational_outlook_handbook.html", "r") as f:
+ROOT = Path(__file__).resolve().parent
+with (ROOT / "occupational_outlook_handbook.html").open(encoding="utf-8") as f:
     soup = BeautifulSoup(f.read(), "html.parser")
 
 # The occupation listings are inside <div class="a-z-list">
 az_list = soup.find("div", class_="a-z-list")
+if az_list is None:
+    raise RuntimeError("BLS A-Z list not found in occupational_outlook_handbook.html")
 
 # Each <li> contains either:
 # 1. A direct link: <a href="url">Occupation Name</a>
@@ -62,7 +66,7 @@ output = []
 for url, name in sorted_occupations:
     output.append({"title": name, "url": url})
 
-with open("occupations.json", "w") as f:
-    json.dump(output, f, indent=2)
+with (ROOT / "occupations.json").open("w", encoding="utf-8") as f:
+    json.dump(output, f, indent=2, ensure_ascii=False)
 
 print(f"\nSaved {len(output)} occupations to occupations.json")
