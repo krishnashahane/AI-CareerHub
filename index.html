@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CareerHub: searchable BLS occupation and AI-exposure dataset.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self';">
+  <title>CareerHub — Occupation Explorer</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+    body { max-width: 1100px; margin: 0 auto; padding: 24px; line-height: 1.5; }
+    header { margin-bottom: 24px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 20px 0; }
+    .card { border: 1px solid #8884; border-radius: 10px; padding: 14px; }
+    input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid #8888; font: inherit; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #8884; }
+    a { color: inherit; }
+    .muted { opacity: .7; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CareerHub</h1>
+    <p class="muted">Searchable occupation explorer built from the repository's BLS Occupational Outlook Handbook data and AI-exposure scores.</p>
+    <p><a href="README.md">Read the project documentation</a></p>
+  </header>
+
+  <label for="search">Search occupations</label>
+  <input id="search" type="search" placeholder="e.g. software developers, nurses, accountants" autocomplete="off">
+
+  <section class="grid" aria-label="Dataset summary">
+    <div class="card"><strong id="count">Loading…</strong><div class="muted">occupations</div></div>
+    <div class="card"><strong id="scored">Loading…</strong><div class="muted">AI scores available</div></div>
+    <div class="card"><strong id="avg">Loading…</strong><div class="muted">average exposure</div></div>
+  </section>
+
+  <table>
+    <thead>
+      <tr><th>Occupation</th><th>Category</th><th>AI exposure</th><th>Source</th></tr>
+    </thead>
+    <tbody id="results">
+      <tr><td colspan="4">Loading data…</td></tr>
+    </tbody>
+  </table>
+
+  <script>
+    const state = { occupations: [], scores: new Map() };
+    const search = document.getElementById("search");
+    const results = document.getElementById("results");
+
+    function addCell(row, text, link) {
+      const cell = document.createElement("td");
+      if (link) {
+        const a = document.createElement("a");
+        a.href = link;
+        a.textContent = text;
+        cell.appendChild(a);
+      } else {
+        cell.textContent = text;
+      }
+      row.appendChild(cell);
+    }
+
+    function render() {
+      const query = search.value.trim().toLowerCase();
+      const matches = state.occupations
+        .filter((item) => !query || item.title.toLowerCase().includes(query) || item.category.toLowerCase().includes(query))
+        .slice(0, 200);
+
+      results.replaceChildren();
+      if (!matches.length) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 4;
+        cell.textContent = "No matching occupations.";
+        row.appendChild(cell);
+        results.appendChild(row);
+        return;
+      }
+
+      for (const item of matches) {
+        const row = document.createElement("tr");
+        addCell(row, item.title, item.slug + ".html");
+        addCell(row, item.category.replaceAll("-", " "));
+        const score = state.scores.get(item.slug);
+        addCell(row, score == null ? "—" : score + "/10");
+        addCell(row, "BLS", item.url);
+        results.appendChild(row);
+      }
+    }
+
+    Promise.all([
+      fetch("occupations.json").then((r) => r.json()),
+      fetch("scores.json").then((r) => r.json())
+    ]).then(([occupations, scores]) => {
+      state.occupations = occupations;
+      state.scores = new Map(scores.map((item) => [item.slug, item.exposure]));
+      document.getElementById("count").textContent = occupations.length.toLocaleString();
+      document.getElementById("scored").textContent = scores.length.toLocaleString();
+
+      const numeric = scores.filter((item) => Number.isFinite(item.exposure));
+      const average = numeric.length
+        ? numeric.reduce((sum, item) => sum + item.exposure, 0) / numeric.length
+        : 0;
+      document.getElementById("avg").textContent = numeric.length ? average.toFixed(1) + "/10" : "—";
+      render();
+    }).catch(() => {
+      results.replaceChildren();
+      const row = document.createElement("tr");
+      const cell = document.createElement("td");
+      cell.colSpan = 4;
+      cell.textContent = "Could not load the dataset. Serve the repository over HTTP instead of opening this file directly.";
+      row.appendChild(cell);
+      results.appendChild(row);
+    });
+
+    search.addEventListener("input", render);
+  </script>
+</body>
+</html>
