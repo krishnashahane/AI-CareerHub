@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import time
+from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
@@ -113,7 +114,18 @@ def score_occupation(client, text, model):
             content = content[:-3]
         content = content.strip()
 
-    return json.loads(content)
+    result = json.loads(content)
+    if not isinstance(result, dict):
+        raise ValueError("Model response must be a JSON object.")
+    exposure = result.get("exposure")
+    rationale = result.get("rationale")
+    if isinstance(exposure, bool) or not isinstance(exposure, (int, float)) or not 0 <= exposure <= 10:
+        raise ValueError(f"Invalid exposure score: {exposure!r}")
+    if not isinstance(rationale, str) or not rationale.strip():
+        raise ValueError("Model response is missing a rationale.")
+    result["exposure"] = int(exposure)
+    result["rationale"] = rationale.strip()
+    return result
 
 
 def main():
@@ -126,15 +138,16 @@ def main():
                         help="Re-score even if already cached")
     args = parser.parse_args()
 
-    with open("occupations.json") as f:
+    root = Path(__file__).resolve().parent
+    with (root / "occupations.json").open(encoding="utf-8") as f:
         occupations = json.load(f)
 
     subset = occupations[args.start:args.end]
 
     # Load existing scores
     scores = {}
-    if os.path.exists(OUTPUT_FILE) and not args.force:
-        with open(OUTPUT_FILE) as f:
+    if (root / OUTPUT_FILE).exists() and not args.force:
+        with (root / OUTPUT_FILE).open(encoding="utf-8") as f:
             for entry in json.load(f):
                 scores[entry["slug"]] = entry
 
@@ -150,13 +163,12 @@ def main():
         if slug in scores:
             continue
 
-        md_path = f"pages/{slug}.md"
-        if not os.path.exists(md_path):
+        md_path = root / "pages" / f"{slug}.md"
+        if not md_path.exists():
             print(f"  [{i+1}] SKIP {slug} (no markdown)")
             continue
 
-        with open(md_path) as f:
-            text = f.read()
+        text = md_path.read_text(encoding="utf-8")
 
         print(f"  [{i+1}/{len(subset)}] {occ['title']}...", end=" ", flush=True)
 
@@ -173,8 +185,8 @@ def main():
             errors.append(slug)
 
         # Save after each one (incremental checkpoint)
-        with open(OUTPUT_FILE, "w") as f:
-            json.dump(list(scores.values()), f, indent=2)
+        with (root / OUTPUT_FILE).open("w", encoding="utf-8") as f:
+            json.dump(list(scores.values()), f, indent=2, ensure_ascii=False)
 
         if i < len(subset) - 1:
             time.sleep(args.delay)
