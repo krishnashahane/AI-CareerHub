@@ -10,16 +10,18 @@ Usage:
 
 import csv
 import json
+from pathlib import Path
 
 
 def main():
     # Load AI exposure scores
-    with open("scores.json") as f:
+    root = Path(__file__).resolve().parent
+    with (root / "scores.json").open(encoding="utf-8") as f:
         scores_list = json.load(f)
     scores = {s["slug"]: s for s in scores_list}
 
     # Load CSV stats
-    with open("occupations.csv") as f:
+    with (root / "occupations.csv").open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
 
@@ -42,10 +44,10 @@ def main():
             "url": row.get("url", ""),
         })
 
-    import os
-    os.makedirs("site", exist_ok=True)
-    with open("site/data.json", "w") as f:
-        json.dump(data, f)
+    site_dir = root / "site"
+    site_dir.mkdir(exist_ok=True)
+    with (site_dir / "data.json").open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
 
     print(f"Wrote {len(data)} occupations to site/data.json")
     total_jobs = sum(d["jobs"] for d in data if d["jobs"])
