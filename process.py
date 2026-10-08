@@ -11,7 +11,7 @@ Usage:
 
 import argparse
 import json
-import os
+from pathlib import Path
 from parse_detail import parse_ooh_page
 
 
@@ -20,10 +20,11 @@ def main():
     parser.add_argument("--force", action="store_true", help="Re-process even if .md exists")
     args = parser.parse_args()
 
-    os.makedirs("pages", exist_ok=True)
+    root = Path(__file__).resolve().parent
+    (root / "pages").mkdir(exist_ok=True)
 
     # Load master list for ordering/metadata
-    with open("occupations.json") as f:
+    with (root / "occupations.json").open(encoding="utf-8") as f:
         occupations = json.load(f)
 
     processed = 0
@@ -31,9 +32,11 @@ def main():
     missing = 0
 
     for occ in occupations:
-        slug = occ["slug"]
-        html_path = f"html/{slug}.html"
-        md_path = f"pages/{slug}.md"
+        slug = occ["slug"].strip()
+        if not slug or slug in {".", ".."} or "/" in slug or "\" in slug:
+            raise ValueError(f"Invalid occupation slug: {slug!r}")
+        html_path = root / "html" / f"{slug}.html"
+        md_path = root / "pages" / f"{slug}.md"
 
         if not os.path.exists(html_path):
             missing += 1
@@ -44,12 +47,13 @@ def main():
             continue
 
         md = parse_ooh_page(html_path)
-        with open(md_path, "w") as f:
-            f.write(md)
+        md_path.write_text(md, encoding="utf-8")
         processed += 1
 
-    total_html = len([f for f in os.listdir("html") if f.endswith(".html")])
-    total_md = len([f for f in os.listdir("pages") if f.endswith(".md")])
+    html_dir = root / "html"
+    pages_dir = root / "pages"
+    total_html = len([f for f in html_dir.iterdir() if f.suffix == ".html"]) if html_dir.exists() else 0
+    total_md = len([f for f in pages_dir.iterdir() if f.suffix == ".md"]) if pages_dir.exists() else 0
     print(f"Processed: {processed}, Skipped (cached): {skipped}, Missing HTML: {missing}")
     print(f"Total: {total_html} HTML files, {total_md} Markdown files")
 
