@@ -9,8 +9,8 @@ Usage:
 
 import csv
 import json
-import os
 import re
+from pathlib import Path
 from bs4 import BeautifulSoup
 
 
@@ -54,10 +54,19 @@ def parse_number(value):
     return value.strip()
 
 
+def safe_slug(value):
+    slug = value.strip()
+    if not slug or slug in {".", ".."} or "/" in slug or "\" in slug:
+        raise ValueError(f"Invalid occupation slug: {slug!r}")
+    return slug
+
+
 def extract_occupation(html_path, occ_meta):
     """Extract one row of data from an HTML file."""
-    with open(html_path) as f:
-        soup = BeautifulSoup(f.read(), "html.parser")
+    source = Path(html_path)
+    if not source.is_file():
+        raise FileNotFoundError(f"HTML source not found: {source}")
+    soup = BeautifulSoup(source.read_text(encoding="utf-8"), "html.parser")
 
     row = {
         "title": occ_meta["title"],
@@ -130,7 +139,8 @@ def extract_occupation(html_path, occ_meta):
 
 
 def main():
-    with open("occupations.json") as f:
+    root = Path(__file__).resolve().parent
+    with (root / "occupations.json").open(encoding="utf-8") as f:
         occupations = json.load(f)
 
     fieldnames = [
@@ -145,14 +155,15 @@ def main():
     rows = []
     missing = 0
     for occ in occupations:
-        html_path = f"html/{occ['slug']}.html"
-        if not os.path.exists(html_path):
+        slug = safe_slug(occ["slug"])
+        html_path = root / "html" / f"{slug}.html"
+        if not html_path.exists():
             missing += 1
             continue
         row = extract_occupation(html_path, occ)
         rows.append(row)
 
-    with open("occupations.csv", "w", newline="") as f:
+    with (root / "occupations.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
