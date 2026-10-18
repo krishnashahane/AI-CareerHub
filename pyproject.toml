@@ -1,7 +1,7 @@
 [project]
-name = "jobs"
-version = "0.1.0"
-description = "Add your description here"
+name = "ai-careerhub"
+version = "0.2.0"
+description = "Searchable BLS occupation explorer and AI-exposure data pipeline"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -10,3 +10,19 @@ dependencies = [
     "playwright>=1.58.0",
     "python-dotenv>=1.2.2",
 ]
+
+[project.scripts]
+careerhub-parse-index = "scripts.parse_occupations:main"
+careerhub-scrape = "scripts.scrape:main"
+careerhub-process = "scripts.process:main"
+careerhub-build-csv = "scripts.make_csv:main"
+careerhub-score = "scripts.score:main"
+careerhub-build-site-data = "scripts.build_site_data:main"
+careerhub-clean-cache = "scripts.clean_cache:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
