@@ -55,11 +55,10 @@ def parse_number(value):
 
 
 def safe_slug(value):
-    slug = value.strip()
-    if not slug or slug in {".", ".."} or "/" in slug or "\" in slug:
+    slug = str(value or "").strip()
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug):
         raise ValueError(f"Invalid occupation slug: {slug!r}")
     return slug
-
 
 def extract_occupation(html_path, occ_meta):
     """Extract one row of data from an HTML file."""
@@ -139,7 +138,7 @@ def extract_occupation(html_path, occ_meta):
 
 
 def main():
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parents[1]
     with (root / "occupations.json").open(encoding="utf-8") as f:
         occupations = json.load(f)
 

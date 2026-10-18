@@ -9,6 +9,9 @@ Usage:
 
 import csv
 import json
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def fmt_pay(pay):
@@ -29,13 +32,13 @@ def fmt_jobs(jobs):
 
 def main():
     # Load all data sources
-    with open("occupations.json") as f:
+    with (ROOT / "occupations.json").open(encoding="utf-8") as f:
         occupations = json.load(f)
 
-    with open("occupations.csv") as f:
+    with (ROOT / "occupations.csv").open(encoding="utf-8", newline="") as f:
         csv_rows = {row["slug"]: row for row in csv.DictReader(f)}
 
-    with open("scores.json") as f:
+    with (ROOT / "scores.json").open(encoding="utf-8") as f:
         scores = {s["slug"]: s for s in json.load(f)}
 
     # Merge into unified records
@@ -225,7 +228,7 @@ def main():
 
     # Write
     text = "\n".join(lines)
-    with open("prompt.md", "w") as f:
+    with (ROOT / "prompt.md").open("w", encoding="utf-8") as f:
         f.write(text)
 
     print(f"Wrote prompt.md ({len(text):,} chars, {len(lines):,} lines)")
