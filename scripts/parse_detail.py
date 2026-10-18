@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import re
-import sys
+import argparse
 
 from bs4 import BeautifulSoup
 
@@ -150,11 +150,16 @@ def parse_ooh_page(html_path):
     return "\n".join(md)
 
 
-if __name__ == "__main__":
-    input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("electricians.html")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Parse one saved BLS occupation HTML page to Markdown.")
+    parser.add_argument("html_path", nargs="?", default="electricians.html")
+    args = parser.parse_args()
+    input_path = Path(args.html_path)
     result = parse_ooh_page(input_path)
     output_path = input_path.with_suffix(".md")
     output_path.write_text(result, encoding="utf-8")
     print(f"Written to {output_path}")
-    print()
-    print(result)
+
+
+if __name__ == "__main__":
+    main()

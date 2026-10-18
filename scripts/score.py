@@ -13,13 +13,14 @@ Usage:
 
 import argparse
 import json
+import math
 import os
 import time
 from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 DEFAULT_MODEL = "google/gemini-3-flash-preview"
 OUTPUT_FILE = "scores.json"
@@ -104,7 +105,13 @@ def score_occupation(client, text, model):
         timeout=60,
     )
     response.raise_for_status()
-    content = response.json()["choices"][0]["message"]["content"]
+    payload = response.json()
+    try:
+        content = payload["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError) as error:
+        raise ValueError("OpenRouter response did not contain a chat message.") from error
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("OpenRouter returned an empty or non-text response.")
 
     # Strip markdown code fences if present
     content = content.strip()
@@ -119,7 +126,13 @@ def score_occupation(client, text, model):
         raise ValueError("Model response must be a JSON object.")
     exposure = result.get("exposure")
     rationale = result.get("rationale")
-    if isinstance(exposure, bool) or not isinstance(exposure, (int, float)) or not 0 <= exposure <= 10:
+    if (
+        isinstance(exposure, bool)
+        or not isinstance(exposure, (int, float))
+        or not math.isfinite(exposure)
+        or not 0 <= exposure <= 10
+        or int(exposure) != exposure
+    ):
         raise ValueError(f"Invalid exposure score: {exposure!r}")
     if not isinstance(rationale, str) or not rationale.strip():
         raise ValueError("Model response is missing a rationale.")
@@ -138,7 +151,14 @@ def main():
                         help="Re-score even if already cached")
     args = parser.parse_args()
 
-    root = Path(__file__).resolve().parent
+    if not os.environ.get("OPENROUTER_API_KEY"):
+        parser.error("OPENROUTER_API_KEY is not set. Export it or define it in .env.")
+    if args.start < 0 or (args.end is not None and args.end < args.start):
+        parser.error("--start must be >= 0 and --end must be >= --start")
+    if args.delay < 0:
+        parser.error("--delay must be >= 0")
+
+    root = Path(__file__).resolve().parents[1]
     with (root / "occupations.json").open(encoding="utf-8") as f:
         occupations = json.load(f)
 
@@ -185,8 +205,11 @@ def main():
             errors.append(slug)
 
         # Save after each one (incremental checkpoint)
-        with (root / OUTPUT_FILE).open("w", encoding="utf-8") as f:
+        temporary_output = (root / OUTPUT_FILE).with_suffix(".json.tmp")
+        with temporary_output.open("w", encoding="utf-8") as f:
             json.dump(list(scores.values()), f, indent=2, ensure_ascii=False)
+            f.write("\n")
+        temporary_output.replace(root / OUTPUT_FILE)
 
         if i < len(subset) - 1:
             time.sleep(args.delay)

@@ -15,7 +15,7 @@ from pathlib import Path
 
 def main():
     # Load AI exposure scores
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parents[1]
     with (root / "scores.json").open(encoding="utf-8") as f:
         scores_list = json.load(f)
     scores = {s["slug"]: s for s in scores_list}
